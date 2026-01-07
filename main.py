@@ -1,6 +1,37 @@
 import os
+import socket
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from urllib.parse import urlparse, urlunparse
+
+
+def resolve_ipv4(hostname):
+    """Resolve hostname to IPv4 address only."""
+    try:
+        # Get IPv4 addresses only (AF_INET)
+        addr_info = socket.getaddrinfo(hostname, None, socket.AF_INET, socket.SOCK_STREAM)
+        if addr_info:
+            return addr_info[0][4][0]
+    except Exception:
+        pass
+    return hostname
+
+
+def convert_to_ipv4_url(db_url):
+    """Convert database URL to use IPv4 address instead of hostname."""
+    try:
+        parsed = urlparse(db_url)
+        hostname = parsed.hostname
+
+        if hostname:
+            ipv4_addr = resolve_ipv4(hostname)
+            # Replace hostname with IPv4 address in the URL
+            netloc = parsed.netloc.replace(hostname, ipv4_addr)
+            new_parsed = parsed._replace(netloc=netloc)
+            return urlunparse(new_parsed)
+    except Exception:
+        pass
+    return db_url
 
 
 def get_supabase_databases():
@@ -33,10 +64,10 @@ def create_table_if_not_exists(conn):
         cursor.execute(create_table_query)
         conn.commit()
         cursor.close()
-        print("  ✓ Table cpr_table checked/created successfully")
+        print("  ✓ Table checked/created successfully")
         return True
-    except Exception as e:
-        print(f"  ✗ Error creating table: {e}")
+    except Exception:
+        print(f"  ✗ Error creating table")
         return False
 
 
@@ -52,29 +83,30 @@ def insert_record(conn):
         count = cursor.fetchone()[0]
 
         cursor.close()
-        print(f"  ✓ Record inserted successfully (Total records: {count})")
+        print(f"  ✓ Record inserted successfully (Total: {count})")
         return True
-    except Exception as e:
-        print(f"  ✗ Error inserting record: {e}")
+    except Exception:
+        print(f"  ✗ Error inserting record")
         return False
 
 
 def process_database(db_name, db_url):
     print(f"\nProcessing database: {db_name}")
-    print(f"  Connection URL: {db_url[:30]}...")
 
     try:
-        conn = psycopg2.connect(db_url)
+        # Convert to IPv4 to avoid IPv6 connection issues
+        ipv4_url = convert_to_ipv4_url(db_url)
+        conn = psycopg2.connect(ipv4_url)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
         if create_table_if_not_exists(conn):
             insert_record(conn)
 
         conn.close()
-        print(f"  ✓ Database {db_name} processed successfully")
+        print(f"  ✓ Database processed successfully")
         return True
-    except Exception as e:
-        print(f"  ✗ Error connecting to database {db_name}: {e}")
+    except Exception:
+        print(f"  ✗ Connection failed")
         return False
 
 
