@@ -105,13 +105,20 @@ def insert_record(conn):
     try:
         cursor = conn.cursor()
 
-        # Get count before insert
+        # Get count and last record before insert
         cursor.execute("SELECT COUNT(*) FROM public.cpr_table;")
         count_before = cursor.fetchone()[0]
 
+        # Get last record info (most recent before insert)
+        cursor.execute(
+            "SELECT id, created_at FROM public.cpr_table ORDER BY id DESC LIMIT 1;"
+        )
+        last_record = cursor.fetchone()
+
         # Insert new record
-        insert_query = "INSERT INTO public.cpr_table (created_at) VALUES (NOW());"
+        insert_query = "INSERT INTO public.cpr_table (created_at) VALUES (NOW()) RETURNING id, created_at;"
         cursor.execute(insert_query)
+        new_record = cursor.fetchone()
         conn.commit()
 
         # Get count after insert
@@ -119,7 +126,15 @@ def insert_record(conn):
         count_after = cursor.fetchone()[0]
 
         cursor.close()
+
+        # Print summary
         print(f"  ✓ Record inserted successfully ({count_before} -> {count_after})")
+        if last_record:
+            print(f"    Previous: [id={last_record[0]}] {last_record[1]}")
+        else:
+            print(f"    Previous: (none - first record)")
+        print(f"    Current:  [id={new_record[0]}] {new_record[1]}")
+
         return True
     except Exception:
         print("  ✗ Error inserting record")
