@@ -3,7 +3,7 @@ import socket
 import subprocess
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 
 def parse_connection_string(db_url):
@@ -33,11 +33,9 @@ def resolve_ipv4_with_dig(hostname):
         if result.returncode == 0 and result.stdout.strip():
             ipv4_addresses = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
             if ipv4_addresses:
-                ipv4 = ipv4_addresses[0]
-                print(f"  [DEBUG] dig resolved {hostname} -> {ipv4}")
-                return ipv4
-    except Exception as e:
-        print(f"  [DEBUG] dig resolution failed: {e}")
+                return ipv4_addresses[0]
+    except Exception:
+        pass
     return None
 
 
@@ -59,11 +57,9 @@ def resolve_ipv4(hostname):
             socket.IPPROTO_TCP
         )
         if addr_info:
-            ipv4 = addr_info[0][4][0]
-            print(f"  [DEBUG] socket resolved {hostname} -> {ipv4}")
-            return ipv4
-    except Exception as e:
-        print(f"  [DEBUG] socket resolution failed: {e}")
+            return addr_info[0][4][0]
+    except Exception:
+        pass
 
     return hostname
 
@@ -100,9 +96,8 @@ def create_table_if_not_exists(conn):
         cursor.close()
         print("  ✓ Table checked/created successfully")
         return True
-    except Exception as e:
-        print(f"  ✗ Error creating table")
-        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
+    except Exception:
+        print("  ✗ Error creating table")
         return False
 
 
@@ -120,9 +115,8 @@ def insert_record(conn):
         cursor.close()
         print(f"  ✓ Record inserted successfully (Total: {count})")
         return True
-    except Exception as e:
-        print(f"  ✗ Error inserting record")
-        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
+    except Exception:
+        print("  ✗ Error inserting record")
         return False
 
 
@@ -133,7 +127,7 @@ def process_database(db_name, db_url):
         # Parse connection string
         conn_params = parse_connection_string(db_url)
         if not conn_params:
-            print(f"  ✗ Invalid connection string")
+            print("  ✗ Invalid connection string")
             return False
 
         # Resolve hostname to IPv4
@@ -152,11 +146,9 @@ def process_database(db_name, db_url):
         # Use hostaddr only if we successfully resolved to an IP
         # hostaddr forces IPv4 and bypasses DNS issues
         if ipv4_addr != hostname and '.' in ipv4_addr and not ipv4_addr.count('.') != 3:
-            print(f"  [DEBUG] Using IPv4 address: {ipv4_addr}")
             conn_kwargs['host'] = hostname
             conn_kwargs['hostaddr'] = ipv4_addr
         else:
-            print(f"  [DEBUG] Using hostname: {hostname}")
             conn_kwargs['host'] = hostname
 
         conn = psycopg2.connect(**conn_kwargs)
@@ -166,11 +158,10 @@ def process_database(db_name, db_url):
             insert_record(conn)
 
         conn.close()
-        print(f"  ✓ Database processed successfully")
+        print("  ✓ Database processed successfully")
         return True
-    except Exception as e:
-        print(f"  ✗ Connection failed")
-        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
+    except Exception:
+        print("  ✗ Connection failed")
         return False
 
 

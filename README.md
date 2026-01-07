@@ -92,11 +92,13 @@ schedule:
 ## Troubleshooting
 
 ### "Network is unreachable" Error
+
 This means you're using the direct connection URL instead of the pooler URL. The direct connection (`db.xxx.supabase.co`) only supports IPv6, which GitHub Actions doesn't support.
 
 **Solution:** Use the Connection Pooler URL (`aws-0-[region].pooler.supabase.com`) as described in the setup instructions above.
 
 ### Database Connection Failed
+
 - Verify you're using the **pooler URL**, not the direct connection URL
 - Check that the password is correct
 - Ensure the Supabase project is active
