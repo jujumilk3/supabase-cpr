@@ -1,5 +1,6 @@
 import os
 import socket
+import subprocess
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from urllib.parse import urlparse, urlunparse
@@ -20,8 +21,34 @@ def parse_connection_string(db_url):
         return None
 
 
+def resolve_ipv4_with_dig(hostname):
+    """Resolve hostname to IPv4 using dig command."""
+    try:
+        result = subprocess.run(
+            ['dig', '+short', 'A', hostname],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            ipv4_addresses = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+            if ipv4_addresses:
+                ipv4 = ipv4_addresses[0]
+                print(f"  [DEBUG] dig resolved {hostname} -> {ipv4}")
+                return ipv4
+    except Exception as e:
+        print(f"  [DEBUG] dig resolution failed: {e}")
+    return None
+
+
 def resolve_ipv4(hostname):
     """Resolve hostname to IPv4 address only."""
+    # Try dig command first (most reliable for getting A records)
+    ipv4 = resolve_ipv4_with_dig(hostname)
+    if ipv4:
+        return ipv4
+
+    # Fallback to socket.getaddrinfo
     try:
         # Force IPv4 resolution using AF_INET
         addr_info = socket.getaddrinfo(
@@ -33,10 +60,11 @@ def resolve_ipv4(hostname):
         )
         if addr_info:
             ipv4 = addr_info[0][4][0]
-            print(f"  [DEBUG] Resolved {hostname} -> {ipv4}")
+            print(f"  [DEBUG] socket resolved {hostname} -> {ipv4}")
             return ipv4
     except Exception as e:
-        print(f"  [DEBUG] DNS resolution failed: {e}")
+        print(f"  [DEBUG] socket resolution failed: {e}")
+
     return hostname
 
 
