@@ -1,20 +1,20 @@
 # Supabase CPR (Database Keep-Alive Service)
 
-Supabase 데이터베이스의 sleep을 방지하는 자동화 서비스입니다. GitHub Actions를 통해 주기적으로 데이터베이스에 접근하여 활성 상태를 유지합니다.
+An automated service to prevent Supabase databases from sleeping. It periodically accesses the database through GitHub Actions to keep it active.
 
-## 작동 원리
+## How It Works
 
-1. 매주 월요일 00:00 UTC에 자동으로 실행 (또는 수동 실행)
-2. GitHub Secrets에 저장된 모든 `SUPABASE_DATABASE_*` 환경 변수를 읽어옴
-3. 각 데이터베이스에 대해:
-   - `cpr_table` 테이블이 없으면 생성
-   - 테이블이 있으면 새로운 레코드 추가
+1. Automatically runs every Monday at 00:00 UTC (or manually triggered)
+2. Reads all `SUPABASE_DATABASE_*` environment variables from GitHub Secrets
+3. For each database:
+   - Creates `cpr_table` if it doesn't exist
+   - Inserts a new record if the table exists
 
-## 설정 방법
+## Setup
 
-### 1. GitHub Secrets 설정
+### 1. Configure GitHub Secrets
 
-Repository Settings > Secrets and variables > Actions로 이동하여 다음과 같이 데이터베이스 연결 정보를 추가합니다:
+Navigate to Repository Settings > Secrets and variables > Actions and add your database connection strings:
 
 ```
 SUPABASE_DATABASE_URL_1=postgresql://user:password@host:5432/database
@@ -22,35 +22,30 @@ SUPABASE_DATABASE_URL_2=postgresql://user:password@host:5432/database
 SUPABASE_DATABASE_URL_3=postgresql://user:password@host:5432/database
 ```
 
-Secret 이름은 반드시 `SUPABASE_DATABASE_`로 시작해야 하며, 뒤에 원하는 식별자를 붙일 수 있습니다.
+Secret names must start with `SUPABASE_DATABASE_`, followed by any identifier you prefer.
 
-### 2. Supabase 데이터베이스 URL 가져오기
+### 2. Get Your Supabase Database URL
 
-Supabase Dashboard에서:
-1. 프로젝트 선택
-2. Settings > Database
-3. Connection String > URI 복사
-4. `[YOUR-PASSWORD]`를 실제 데이터베이스 비밀번호로 변경
+From the Supabase Dashboard:
+1. Select your project
+2. Go to Settings > Database
+3. Copy the Connection String > URI
+4. Replace `[YOUR-PASSWORD]` with your actual database password
 
-예시:
+Example:
 ```
 postgresql://postgres.xxxxx:password@aws-0-region.pooler.supabase.com:5432/postgres
 ```
 
-### 3. GitHub Actions에서 Secret 매핑
+### 3. Automatic Secret Loading
 
-`.github/workflows/keep-alive.yml` 파일에서 추가한 Secret들을 매핑합니다:
+This project uses `oNaiPs/secrets-to-env-action` to automatically load all secrets starting with `SUPABASE_DATABASE_` as environment variables.
 
-```yaml
-env:
-  SUPABASE_DATABASE_URL_1: ${{ secrets.SUPABASE_DATABASE_URL_1 }}
-  SUPABASE_DATABASE_URL_2: ${{ secrets.SUPABASE_DATABASE_URL_2 }}
-  # 필요한 만큼 추가
-```
+This means you don't need to modify the workflow file when adding new databases. Simply add them to GitHub Secrets and they'll be automatically detected.
 
-## 테이블 구조
+## Table Structure
 
-자동으로 생성되는 `cpr_table`의 구조:
+The `cpr_table` that's automatically created:
 
 ```sql
 CREATE TABLE public.cpr_table (
@@ -67,45 +62,45 @@ CREATE TABLE public.cpr_table (
 );
 ```
 
-## 로컬에서 테스트
+## Local Testing
 
 ```bash
-# 의존성 설치
+# Install dependencies
 pip install psycopg2-binary
 
-# 환경 변수 설정
+# Set environment variable
 export SUPABASE_DATABASE_URL_1="postgresql://..."
 
-# 실행
+# Run
 python main.py
 ```
 
-## 수동 실행
+## Manual Execution
 
-GitHub Actions 페이지에서 `Supabase Database Keep-Alive` workflow를 선택하고 `Run workflow` 버튼을 클릭하여 수동으로 실행할 수 있습니다.
+Go to the GitHub Actions page, select the `Supabase Database Keep-Alive` workflow, and click the `Run workflow` button to execute manually.
 
-## 실행 주기 변경
+## Change Execution Schedule
 
-`.github/workflows/keep-alive.yml` 파일의 cron 표현식을 수정하여 실행 주기를 변경할 수 있습니다:
+Modify the cron expression in the `.github/workflows/keep-alive.yml` file to change the execution schedule:
 
 ```yaml
 schedule:
-  - cron: '0 0 * * 1'  # 매주 월요일 00:00 UTC
-  # - cron: '0 0 * * *'  # 매일 00:00 UTC
-  # - cron: '0 */12 * * *'  # 12시간마다
+  - cron: '0 0 * * 1'  # Every Monday at 00:00 UTC
+  # - cron: '0 0 * * *'  # Every day at 00:00 UTC
+  # - cron: '0 */12 * * *'  # Every 12 hours
 ```
 
-## 문제 해결
+## Troubleshooting
 
-### 데이터베이스 연결 실패
-- Supabase 데이터베이스 URL이 올바른지 확인
-- 비밀번호가 정확한지 확인
-- Supabase 프로젝트가 활성 상태인지 확인
+### Database Connection Failed
+- Verify the Supabase database URL is correct
+- Check that the password is accurate
+- Ensure the Supabase project is active
 
-### GitHub Actions 실행 확인
-- Actions 탭에서 workflow 실행 로그 확인
-- 각 단계의 출력 메시지를 통해 오류 확인
+### GitHub Actions Execution Check
+- Check the workflow execution logs in the Actions tab
+- Review error messages in each step's output
 
-## 라이선스
+## License
 
 MIT
