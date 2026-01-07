@@ -66,8 +66,9 @@ def create_table_if_not_exists(conn):
         cursor.close()
         print("  ✓ Table checked/created successfully")
         return True
-    except Exception:
+    except Exception as e:
         print(f"  ✗ Error creating table")
+        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
         return False
 
 
@@ -85,8 +86,9 @@ def insert_record(conn):
         cursor.close()
         print(f"  ✓ Record inserted successfully (Total: {count})")
         return True
-    except Exception:
+    except Exception as e:
         print(f"  ✗ Error inserting record")
+        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
         return False
 
 
@@ -96,6 +98,7 @@ def process_database(db_name, db_url):
     try:
         # Convert to IPv4 to avoid IPv6 connection issues
         ipv4_url = convert_to_ipv4_url(db_url)
+        print(f"  [DEBUG] Attempting connection...")
         conn = psycopg2.connect(ipv4_url)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
@@ -105,8 +108,9 @@ def process_database(db_name, db_url):
         conn.close()
         print(f"  ✓ Database processed successfully")
         return True
-    except Exception:
+    except Exception as e:
         print(f"  ✗ Connection failed")
+        print(f"  [ERROR] {type(e).__name__}: {str(e)}")
         return False
 
 
