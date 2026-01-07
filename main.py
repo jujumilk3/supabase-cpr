@@ -5,33 +5,39 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from urllib.parse import urlparse, urlunparse
 
 
+def parse_connection_string(db_url):
+    """Parse connection string and return components."""
+    try:
+        parsed = urlparse(db_url)
+        return {
+            'dbname': parsed.path.lstrip('/') or 'postgres',
+            'user': parsed.username,
+            'password': parsed.password,
+            'host': parsed.hostname,
+            'port': parsed.port or 5432
+        }
+    except Exception:
+        return None
+
+
 def resolve_ipv4(hostname):
     """Resolve hostname to IPv4 address only."""
     try:
-        # Get IPv4 addresses only (AF_INET)
-        addr_info = socket.getaddrinfo(hostname, None, socket.AF_INET, socket.SOCK_STREAM)
+        # Force IPv4 resolution using AF_INET
+        addr_info = socket.getaddrinfo(
+            hostname,
+            None,
+            socket.AF_INET,  # Force IPv4
+            socket.SOCK_STREAM,
+            socket.IPPROTO_TCP
+        )
         if addr_info:
-            return addr_info[0][4][0]
-    except Exception:
-        pass
+            ipv4 = addr_info[0][4][0]
+            print(f"  [DEBUG] Resolved {hostname} -> {ipv4}")
+            return ipv4
+    except Exception as e:
+        print(f"  [DEBUG] DNS resolution failed: {e}")
     return hostname
-
-
-def convert_to_ipv4_url(db_url):
-    """Convert database URL to use IPv4 address instead of hostname."""
-    try:
-        parsed = urlparse(db_url)
-        hostname = parsed.hostname
-
-        if hostname:
-            ipv4_addr = resolve_ipv4(hostname)
-            # Replace hostname with IPv4 address in the URL
-            netloc = parsed.netloc.replace(hostname, ipv4_addr)
-            new_parsed = parsed._replace(netloc=netloc)
-            return urlunparse(new_parsed)
-    except Exception:
-        pass
-    return db_url
 
 
 def get_supabase_databases():
@@ -96,10 +102,36 @@ def process_database(db_name, db_url):
     print(f"\nProcessing database: {db_name}")
 
     try:
-        # Convert to IPv4 to avoid IPv6 connection issues
-        ipv4_url = convert_to_ipv4_url(db_url)
-        print(f"  [DEBUG] Attempting connection...")
-        conn = psycopg2.connect(ipv4_url)
+        # Parse connection string
+        conn_params = parse_connection_string(db_url)
+        if not conn_params:
+            print(f"  ✗ Invalid connection string")
+            return False
+
+        # Resolve hostname to IPv4
+        hostname = conn_params['host']
+        ipv4_addr = resolve_ipv4(hostname)
+
+        # Build connection parameters
+        conn_kwargs = {
+            'dbname': conn_params['dbname'],
+            'user': conn_params['user'],
+            'password': conn_params['password'],
+            'port': conn_params['port'],
+            'connect_timeout': 10
+        }
+
+        # Use hostaddr only if we successfully resolved to an IP
+        # hostaddr forces IPv4 and bypasses DNS issues
+        if ipv4_addr != hostname and '.' in ipv4_addr and not ipv4_addr.count('.') != 3:
+            print(f"  [DEBUG] Using IPv4 address: {ipv4_addr}")
+            conn_kwargs['host'] = hostname
+            conn_kwargs['hostaddr'] = ipv4_addr
+        else:
+            print(f"  [DEBUG] Using hostname: {hostname}")
+            conn_kwargs['host'] = hostname
+
+        conn = psycopg2.connect(**conn_kwargs)
         conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 
         if create_table_if_not_exists(conn):
