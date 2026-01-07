@@ -12,36 +12,38 @@ An automated service to prevent Supabase databases from sleeping. It periodicall
 
 ## Setup
 
-### 1. Configure GitHub Secrets
+### 1. Get Your Supabase Connection Pooler URL
 
-Navigate to Repository Settings > Secrets and variables > Actions and add your database connection strings:
+**IMPORTANT:** You must use the **Connection Pooler** URL, not the direct connection URL, to avoid IPv6 issues in GitHub Actions.
+
+From the Supabase Dashboard:
+1. Select your project
+2. Click the **"Connect"** button (top right)
+3. Select **"Method -> Session Pooler"** mode (Port 5432)
+4. Copy the connection string
+
+The pooler URL format:
+```
+postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+```
+
+Example:
+```
+postgresql://postgres.abcdefghijklmnop:your_password@aws-0-us-west-1.pooler.supabase.com:5432/postgres
+```
+
+### 2. Add to GitHub Secrets
+
+Navigate to Repository Settings > Secrets and variables > Actions and add your pooler connection strings:
 
 ```
-SUPABASE_DATABASE_URL_1=postgresql://user:password@host:5432/database
-SUPABASE_DATABASE_URL_2=postgresql://user:password@host:5432/database
-SUPABASE_DATABASE_URL_3=postgresql://user:password@host:5432/database
+SUPABASE_DATABASE_URL_PROD=postgresql://postgres.xxxxx:password@aws-0-us-west-1.pooler.supabase.com:5432/postgres
+SUPABASE_DATABASE_URL_DEV=postgresql://postgres.yyyyy:password@aws-0-us-east-1.pooler.supabase.com:5432/postgres
 ```
 
 Secret names must start with `SUPABASE_DATABASE_`, followed by any identifier you prefer.
 
-### 2. Get Your Supabase Database URL
-
-From the Supabase Dashboard:
-1. Select your project
-2. Go to Settings > Database
-3. Copy the Connection String > URI
-4. Replace `[YOUR-PASSWORD]` with your actual database password
-
-Example:
-```
-postgresql://postgres.xxxxx:password@aws-0-region.pooler.supabase.com:5432/postgres
-```
-
-### 3. Automatic Secret Loading
-
-This project uses `oNaiPs/secrets-to-env-action` to automatically load all secrets starting with `SUPABASE_DATABASE_` as environment variables.
-
-This means you don't need to modify the workflow file when adding new databases. Simply add them to GitHub Secrets and they'll be automatically detected.
+All secrets starting with `SUPABASE_DATABASE_` are automatically detected - no need to modify the workflow file when adding new databases.
 
 ## Table Structure
 
@@ -65,14 +67,11 @@ CREATE TABLE public.cpr_table (
 ## Local Testing
 
 ```bash
-# Install dependencies
-pip install psycopg2-binary
+# Set environment variable with pooler URL
+export SUPABASE_DATABASE_URL_1="postgresql://postgres.xxxxx:password@aws-0-us-west-1.pooler.supabase.com:5432/postgres"
 
-# Set environment variable
-export SUPABASE_DATABASE_URL_1="postgresql://..."
-
-# Run
-python main.py
+# Run with uv (dependencies are automatically installed)
+uv run main.py
 ```
 
 ## Manual Execution
@@ -92,14 +91,15 @@ schedule:
 
 ## Troubleshooting
 
-### Database Connection Failed
-- Verify the Supabase database URL is correct
-- Check that the password is accurate
-- Ensure the Supabase project is active
+### "Network is unreachable" Error
+This means you're using the direct connection URL instead of the pooler URL. The direct connection (`db.xxx.supabase.co`) only supports IPv6, which GitHub Actions doesn't support.
 
-### GitHub Actions Execution Check
-- Check the workflow execution logs in the Actions tab
-- Review error messages in each step's output
+**Solution:** Use the Connection Pooler URL (`aws-0-[region].pooler.supabase.com`) as described in the setup instructions above.
+
+### Database Connection Failed
+- Verify you're using the **pooler URL**, not the direct connection URL
+- Check that the password is correct
+- Ensure the Supabase project is active
 
 ## License
 
